@@ -67,7 +67,7 @@ void execute(std::string oprand[],int size){
 				dup2(out,1);
 				close(out);
 				execute2(oprand,q);
-				int in = open("tmp".c_str(),O_RDONLY);
+				int in = open("tmp",O_RDONLY);
 				dup2(in,0);
 				close(in);
 				execute2(oprand[q+1],size);
