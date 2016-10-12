@@ -40,7 +40,7 @@ void execute2(std::string oprand[],int size){
 		args[i]=tmp[i];
 	}
 	args[size]=NULL;
-	printf("execvp exit status%d\n",execvp(path(args[0]).c_str(),args));
+	printf("execvp exit status%d\n",execvp(args[0],args));
 
 }
 
@@ -70,13 +70,14 @@ void execute(std::string oprand[],int size){
 				int in = open("tmp",O_RDONLY);
 				dup2(in,0);
 				close(in);
-				execute2(oprand[q+1],size);
+				execute2(oprand+q+1,size);
 
 			}
 		}
 		//ここまで
-		
-		if(size=q+1) execute2(oprand,size);
+		if(size==q){
+		       	execute2(oprand,size);
+		}
 		//std::cout<< "created pid" <<  getpid() << std::endl;
 		//printf("%d\n",execl("/bin/ls","/bin/ls",NULL));
 		exit(0);
