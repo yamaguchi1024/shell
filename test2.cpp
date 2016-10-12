@@ -9,57 +9,6 @@
 #include<signal.h>
 #include<fcntl.h>
 
-void execute(std::string oprand[],int size){
-	int fork_result = fork();
-	//リダイレクトとパイプライン処理
-	int q=0;
-	for(q=0;q<size;q++){
-		if(oprand[q]=="<"){
-			int fd = open(oprand[q+1].c_str(),O_RDONLY);
-			dup2(fd,0);
-			close(fd);
-			size=q;
-			break;
-		}
-		else if(oprand[q]==">"){
-			int fd = open(oprand[q+1].c_str(),O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWGRP | S_IWUSR);
-			dup2(fd,1);
-			close(fd);
-			size=q;
-			break;
-		}
-		else if(oprand[q]=="|"){
-		}
-	}
-	//ここまで
-
-	char *args[100];
-	char tmp[100][100];
-	for(int i=0;i<size;i++){
-		strcpy(tmp[i],oprand[i].c_str());
-		args[i]=tmp[i];
-	}
-	args[size]=NULL;
-
-	if(fork_result==0){
-		//std::cout<< "created pid" <<  getpid() << std::endl;
-		printf("exit status%d\n",execvp(args[0],args));
-		//printf("%d\n",execl("/bin/ls","/bin/ls",NULL));
-		exit(0);
-	}
-	else if(fork_result==-1) printf("Fork Failed!\n");
-
-	//std::cout <<"Child pid" << fork_result << std::endl;
-	int status;
-	waitpid(fork_result,&status,WUNTRACED);
-	printf("child process done.\n");
-
-	if(WIFEXITED(status)){
-		printf("exit status=%d\n",WEXITSTATUS(status));
-	}else{
-		printf("exit abnormally\n");
-	}
-}
 std::string path(std::string opr){
 	char env[100];
 	char *tmp=getenv("PATH");
@@ -81,6 +30,69 @@ std::string path(std::string opr){
 		}
 	}
 	return rtn;
+}
+void execute2(std::string oprand[],int size){
+
+	char *args[100];
+	char tmp[100][100];
+	for(int i=0;i<size;i++){
+		strcpy(tmp[i],oprand[i].c_str());
+		args[i]=tmp[i];
+	}
+	args[size]=NULL;
+	printf("execvp exit status%d\n",execvp(path(args[0]).c_str(),args));
+
+}
+
+void execute(std::string oprand[],int size){
+	int fork_result = fork();
+	//リダイレクトとパイプライン処理
+	if(fork_result==0){
+		int q=0;
+		for(q=0;q<size;q++){
+			if(oprand[q]=="<"){
+				int in = open(oprand[q+1].c_str(),O_RDONLY);
+				dup2(in,0);
+				close(in);
+				execute2(oprand,q);
+			}
+			else if(oprand[q]==">"){
+				int out = open(oprand[q+1].c_str(),O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWGRP | S_IWUSR);
+				dup2(out,1);
+				close(out);
+				execute2(oprand,q);
+			}
+			else if(oprand[q]=="|"){
+				int out = open("tmp",O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWGRP | S_IWUSR);
+				dup2(out,1);
+				close(out);
+				execute2(oprand,q);
+				int in = open("tmp".c_str(),O_RDONLY);
+				dup2(in,0);
+				close(in);
+				execute2(oprand[q+1],size);
+
+			}
+		}
+		//ここまで
+		
+		if(size=q+1) execute2(oprand,size);
+		//std::cout<< "created pid" <<  getpid() << std::endl;
+		//printf("%d\n",execl("/bin/ls","/bin/ls",NULL));
+		exit(0);
+	}
+	else if(fork_result==-1) printf("Fork Failed!\n");
+
+	//std::cout <<"Child pid" << fork_result << std::endl;
+	int status;
+	waitpid(fork_result,&status,WUNTRACED);
+	printf("child process done.\n");
+
+	if(WIFEXITED(status)){
+		printf("child process exit status=%d\n",WEXITSTATUS(status));
+	}else{
+		printf("exit abnormally\n");
+	}
 }
 void SigHandler(int p_signame){
 	signal(SIGINT,SigHandler);	
