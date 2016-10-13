@@ -39,14 +39,8 @@ int execute3(std::string oprand[],int size, int in, int out){
             perror("fork");
             return -1;
         case 0: // child
-            if(in != 0) {
-                dup2(in,0);
-                close(in);
-            }
-            if(out!= 1) {
-                dup2(out,1);
-                close(out);
-            }
+            dup2(in,0);
+            dup2(out,1);
             char *args[100];
             char tmp[100][100];
             for(int i=0;i<size;i++){
@@ -71,19 +65,22 @@ void execute2(std::vector<int>& childpid, std::string oprand[],int size,int in, 
     for(q=0;q<size;q++){
         if(oprand[q]=="<"){
             last = std::min(last, q);
+            if(in != 0) close(in);
             in = open(oprand[q+1].c_str(),O_RDONLY);
             q++;
         }
         else if(oprand[q]==">"){
             last = std::min(last, q);
+            if(out!= 1) close(out);
             out = open(oprand[q+1].c_str(),O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWGRP | S_IWUSR);
             q++;
         }
         else if(oprand[q]=="|"){
             last = std::min(last, q);
             int pipefd[2];
-            pipe(pipefd);
+            pipe2(pipefd,O_CLOEXEC);
             execute2(childpid,oprand+q+1,size-q-1,pipefd[0],1);
+            if(out!= 1) close(out);
             out = pipefd[1];
             break;
         }
