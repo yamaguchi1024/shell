@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<iostream>
 #include<unistd.h>
 #include<stdlib.h>
 #include<sys/types.h>
@@ -8,7 +9,8 @@
 #include<signal.h>
 #include<fcntl.h>
 
-#include "list.c"
+#include "util.h"
+#include "ringlist.h"
 
 int execute3(std::string oprand[],int size, int in, int out){
     int fork_result = fork();
@@ -36,25 +38,25 @@ int execute3(std::string oprand[],int size, int in, int out){
 
 }
 
-void execute2(list *childpid, std::string oprand[],int size,int in, int out){
+void execute2(ringlist *childpid, std::string oprand[],int size,int in, int out){
     //リダイレクトとパイプライン処理
     int q=0;
     int last=size;
     for(q=0;q<size;q++){
         if(oprand[q]=="<"){
-            last = std::min(last, q);
+            last = min(last, q);
             if(in != 0) close(in);
             in = open(oprand[q+1].c_str(),O_RDONLY);
             q++;
         }
         else if(oprand[q]==">"){
-            last = std::min(last, q);
+            last = min(last, q);
             if(out!= 1) close(out);
             out = open(oprand[q+1].c_str(),O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWGRP | S_IWUSR);
             q++;
         }
         else if(oprand[q]=="|"){
-            last = std::min(last, q);
+            last = min(last, q);
             int pipefd[2];
             pipe2(pipefd,O_CLOEXEC);
             execute2(childpid,oprand+q+1,size-q-1,pipefd[0],1);
@@ -69,19 +71,21 @@ void execute2(list *childpid, std::string oprand[],int size,int in, int out){
     if(out!= 1) close(out);
 
     if(cpid != -1)
-        list_add(childpid, cpid);
+        ringlist_add(childpid, cpid);
 }
 
 void execute(std::string oprand[],int size) {
-    list childpid;
-    execute2(&childpid,oprand,size,0,1);
+    ringlist *childpid = ringlist_init();
+    execute2(childpid,oprand,size,0,1);
 
-    for(list *it = &childpid; it->next; it=it->next) {
+    ringlist *it;
+    for(it = childpid; it->next; ) {
         int status;
-        if(!waitpid(it->num,&status,WUNTRACED | WNOHANG))
+        if(!waitpid(it->num,&status,WUNTRACED | WNOHANG)) {
+            it = it->next;
             continue;
-        list_erase(it);
-        it = it->prev;
+        }
+        it = ringlist_erase(it);
 
         printf("child process done.\n");
         if(WIFEXITED(status)){
@@ -90,6 +94,7 @@ void execute(std::string oprand[],int size) {
             printf("exit abnormally\n");
         }
     }
+    free(it);
     printf("all children exited\n");
     return;
 
@@ -97,7 +102,7 @@ void execute(std::string oprand[],int size) {
 void SigHandler(int p_signame){
     signal(SIGINT,SigHandler);	
     printf("\n\033[%dm>>\033[0m",31);
-    std::cout << std::flush ;
+    fflush(stdout);
     return;
 }	
 
