@@ -104,6 +104,31 @@ void SigHandler(int p_signame){
     std::cout << std::flush ;
     return;
 }	
+int kbhit(void)
+{
+	struct termios oldt, newt;
+	int ch;
+	int oldf;
+
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON | ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+	oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+	fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+	ch = getchar();
+
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+	if (ch != EOF) {
+		ungetc(ch, stdin);
+		return 1;
+	}
+
+	return 0;
+}
 void uparrow(int x){
 	FILE *fp;
 	char s[256];
@@ -117,99 +142,109 @@ void uparrow(int x){
 		ss[i]=(char*)malloc(sizeof(s));
 		strcpy(ss[i],s);
 		i++;
-		fflush(stdin);
+		//fflush(stdin);
 	}
-	printf("%s",ss[i-x]);
-	int j=0;
-	for(j=0;j<i;j++) free(ss[i]);
+	if(i<x+1){ return;}
+	strcpy(s,ss[i-x-1]);
+	int q=0;
+	while(1){
+		if(s[q]=='\n'){ s[q]='\0'; break;}
+		q++;
+	}
+	printf("%s",s);
+	while(1){
+		if(kbhit()){
+			int c;
+			c=getchar();
+			if(c=='\n'){
+				char tmp[100];
+				strcpy(tmp,s);
+				char *tp;
+				tp=strtok(tmp," ");
+				std::string ops[10];
+				int i=0;
+				while(tp!=NULL){
+					ops[i]=std::string(tp);
+					i++;
+					tp=strtok(NULL," ");
+				}
+				printf("\n");
+				execute(ops,i);
+				break;
+			}else{
+				while(getchar()!=EOF){
+				}
+				break;
+			}
+		}
+	}
+
+	int j;
+	for(j=0;j<i;j++) free(ss[j]);
 
 	fclose(fp);
 	return;
 }
-int kbhit(void)
-{
-    struct termios oldt, newt;
-    int ch;
-    int oldf;
-
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
-
-    ch = getchar();
-
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    fcntl(STDIN_FILENO, F_SETFL, oldf);
-
-    if (ch != EOF) {
-        ungetc(ch, stdin);
-        return 1;
-    }
-
-    return 0;
-}
 
 int main(){
-    signal(SIGINT,SigHandler);	
-    char *buf;
-    int uparrow_cnt=-1;
+	signal(SIGINT,SigHandler);	
+	int uparrow_cnt=-1;
 
-    while(1){
-        printf("\033[%dm>>\033[0m",31);
-        std::string oprand;
-	int c;
 	while(1){
-		if(kbhit()){
-			c=getchar();
-			if(c=='\x1B'){ 
+		printf("\033[%dm>>\033[0m",31);
+		std::string oprand;
+		int c;
+		while(1){
+			if(kbhit()){
 				c=getchar();
-				c=getchar();
-				oprand="\x1B[A";
-				uparrow_cnt++;
-			       	break;}
-			else{printf("%c",c);}
-		       	if(c=='\n') break;
-			oprand+=(char)c;
+				if(c=='\x1B'){ 
+					c=getchar();
+					c=getchar();
+					oprand="\x1B[";
+					oprand+=(char)c;
+					break;}
+				else{printf("%c",c);}
+				if(c=='\n') break;
+				oprand+=(char)c;
+			}
 		}
+
+		//fileに書き込み
+		if(oprand[0]!='\x1B'){
+			FILE *fp;
+			fp=fopen(".shrc","a");
+			if(fp==NULL){ printf("cannot open .shrc\n");}
+			fputs((oprand+"\n").c_str(),fp);
+			fclose(fp);
+		}
+
+		char tmp[100];
+		strcpy(tmp,oprand.c_str());
+		char *tp;
+		tp=strtok(tmp," ");
+		std::string ops[10];
+		int i=0;
+		while(tp!=NULL){
+			ops[i]=std::string(tp);
+			i++;
+			tp=strtok(NULL," ");
+		}
+
+		if(ops[0]=="\x1B[A"){
+			uparrow_cnt++;
+			uparrow(uparrow_cnt);
+		}else if(ops[0]=="cd"){
+			uparrow_cnt=-1;
+			chdir(ops[1].c_str());
+		}else if(ops[0]=="exit" || ops[0]=="quit" || ops[0]=="q"){
+			unlink(".shrc");
+			return 0;
+		}else{
+			uparrow_cnt=-1;
+			execute(ops,i);
+		}
+
 	}
 
-	//fileに書き込み
-	FILE *fp;
-	fp=fopen(".shrc","a");
-	if(fp==NULL){ printf("cannot open .shrc\n");}
-	fputs((oprand+"\n").c_str(),fp);
-	fclose(fp);
-
-	char tmp[100];
-	strcpy(tmp,oprand.c_str());
-	char *tp;
-	tp=strtok(tmp," ");
-	std::string ops[10];
-	int i=0;
-	while(tp!=NULL){
-		ops[i]=std::string(tp);
-		i++;
-		tp=strtok(NULL," ");
-	}
-
-	if(ops[0]=="\x1B[A"){
-		uparrow(uparrow_cnt);
-	}else if(ops[0]=="cd"){
-		uparrow_cnt=0;
-		//printf("change dir: %d",chdir(ops[1].c_str()));
-		chdir(ops[1].c_str());
-	}else if(ops[0]=="exit" || ops[0]=="quit" || ops[0]=="q"){
-		return 0;
-	}else{
-		uparrow_cnt=0;
-		//std::cout << "ops[0]: " << ops[0] << "ops[1]: " << ops[1] << "i: " << i << std::endl;
-		execute(ops,i);
-	}
-
-    }
-
-    return 0;
+	return 0;
 }
