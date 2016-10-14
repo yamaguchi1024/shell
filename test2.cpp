@@ -9,29 +9,9 @@
 #include<string.h>
 #include<signal.h>
 #include<fcntl.h>
+#include<termios.h>
+#include<fcntl.h>
 
-std::string path(std::string opr){
-    char env[100];
-    char *tmp=getenv("PATH");
-    strcpy(env,tmp);
-    char *tp;
-    tp=strtok(env,":");
-    std::string paths[10];
-    int i=0;
-    while(tp!=NULL){
-        paths[i]=std::string(tp);
-        i++;
-        tp=strtok(NULL,":");
-    }
-    std::string rtn=opr;
-    for(int j=0;j<i;j++){
-        if(!access((paths[j]+"/"+opr).c_str(),X_OK)){
-            rtn=paths[j]+"/"+opr;
-            break;
-        }
-    }
-    return rtn;
-}
 int execute3(std::string oprand[],int size, int in, int out){
     int fork_result = fork();
     switch(fork_result) {
@@ -92,10 +72,6 @@ void execute2(std::vector<int>& childpid, std::string oprand[],int size,int in, 
 
     if(cpid != -1)
         childpid.push_back(cpid);
-    //std::cout<< "created pid" <<  getpid() << std::endl;
-    //printf("%d\n",execl("/bin/ls","/bin/ls",NULL));
-
-    //std::cout <<"Child pid" << fork_result << std::endl;
 }
 
 void execute(std::string oprand[],int size) {
@@ -128,35 +104,110 @@ void SigHandler(int p_signame){
     std::cout << std::flush ;
     return;
 }	
+void uparrow(int x){
+	FILE *fp;
+	char s[256];
+	char *ss[300];
+	if((fp=fopen(".shrc","r"))==NULL){
+		printf("file open error!\n");
+		return;
+	}
+	int i=0;
+	while(fgets(s,256,fp)!=NULL){
+		ss[i]=(char*)malloc(sizeof(s));
+		strcpy(ss[i],s);
+		i++;
+		fflush(stdin);
+	}
+	printf("%s",ss[i-x]);
+	int j=0;
+	for(j=0;j<i;j++) free(ss[i]);
+
+	fclose(fp);
+	return;
+}
+int kbhit(void)
+{
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+    ch = getchar();
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+    if (ch != EOF) {
+        ungetc(ch, stdin);
+        return 1;
+    }
+
+    return 0;
+}
 
 int main(){
     signal(SIGINT,SigHandler);	
+    char *buf;
+    int uparrow_cnt=-1;
 
     while(1){
         printf("\033[%dm>>\033[0m",31);
         std::string oprand;
-        std::getline(std::cin,oprand);
-        char tmp[100];
-        strcpy(tmp,oprand.c_str());
-        char *tp;
-        tp=strtok(tmp," ");
-        std::string ops[10];
-        int i=0;
-        while(tp!=NULL){
-            ops[i]=std::string(tp);
-            i++;
-            tp=strtok(NULL," ");
-        }
+	int c;
+	while(1){
+		if(kbhit()){
+			c=getchar();
+			if(c=='\x1B'){ 
+				c=getchar();
+				c=getchar();
+				oprand="\x1B[A";
+				uparrow_cnt++;
+			       	break;}
+			else{printf("%c",c);}
+		       	if(c=='\n') break;
+			oprand+=(char)c;
+		}
+	}
 
-        if(ops[0]=="cd"){
-            //printf("change dir: %d",chdir(ops[1].c_str()));
-            chdir(ops[1].c_str());
-        }else if(ops[0]=="exit" || ops[0]=="quit"){
-            return 0;
-        }else{
-            //std::cout << "ops[0]: " << ops[0] << "ops[1]: " << ops[1] << "i: " << i << std::endl;
-            execute(ops,i);
-        }
+	//fileに書き込み
+	FILE *fp;
+	fp=fopen(".shrc","a");
+	if(fp==NULL){ printf("cannot open .shrc\n");}
+	fputs((oprand+"\n").c_str(),fp);
+	fclose(fp);
+
+	char tmp[100];
+	strcpy(tmp,oprand.c_str());
+	char *tp;
+	tp=strtok(tmp," ");
+	std::string ops[10];
+	int i=0;
+	while(tp!=NULL){
+		ops[i]=std::string(tp);
+		i++;
+		tp=strtok(NULL," ");
+	}
+
+	if(ops[0]=="\x1B[A"){
+		uparrow(uparrow_cnt);
+	}else if(ops[0]=="cd"){
+		uparrow_cnt=0;
+		//printf("change dir: %d",chdir(ops[1].c_str()));
+		chdir(ops[1].c_str());
+	}else if(ops[0]=="exit" || ops[0]=="quit" || ops[0]=="q"){
+		return 0;
+	}else{
+		uparrow_cnt=0;
+		//std::cout << "ops[0]: " << ops[0] << "ops[1]: " << ops[1] << "i: " << i << std::endl;
+		execute(ops,i);
+	}
 
     }
 
