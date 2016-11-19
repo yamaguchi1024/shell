@@ -198,6 +198,7 @@ int main(){
 		std::string oprand;
 		int c;
 		while(1){
+      usleep(100000);
 			if(kbhit()){
 				c=getchar();
 				if(c=='\x1B'){ 
