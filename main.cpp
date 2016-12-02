@@ -10,6 +10,7 @@
 #include<fcntl.h>
 #include<termios.h>
 #include<fcntl.h>
+#include<sys/wait.h>
 
 #include "util.h"
 #include "ringlist.h"
@@ -33,7 +34,7 @@ lli get_child_cpustate(char *proc){
 
 lli get_cpustate(void){
     FILE *fp;
-    if((fp=fopen("/proc/stat","r"))==NULL){ printf("/proc/stat open error!\n"); return -1;}
+    if((fp = fopen("/proc/stat","r")) == NULL){ printf("/proc/stat open error!\n"); }
     char tmp[20];
     fscanf(fp,"%s",tmp);
     int i=0;
@@ -41,7 +42,7 @@ lli get_cpustate(void){
     lli res;
     for(i=0;i<10;i++){
         fscanf(fp,"%lld",&time);
-        res+=time;
+        res +=time;
     }
     fclose(fp);
     return res;
@@ -56,16 +57,16 @@ void display_mems(int pid)
     sprintf(p,"%d",pid);
     strcat(proc,p);
     strcat(proc,stat);
-    printf("%s\n",proc);
+    int status;
 
-    lli p_cpu1 = get_child_cpustate(proc);
-    lli c_cpu1 = get_cpustate();
-    sleep(5);
-    lli p_cpu2 = get_child_cpustate(proc);
-    lli c_cpu2 = get_cpustate();
-    printf("p_cpu1: %lld p_cpu2: %lld c_cpu1: %lld c_cpu2: %lld\n",p_cpu1,p_cpu2,c_cpu1,c_cpu2);
-    printf("cpu: %f\n",(float)(p_cpu2-p_cpu1)/(c_cpu2-c_cpu1));
-    printf("mama!!\n");
+    while(1){
+        lli p_cpu1 = get_child_cpustate(proc);
+        lli c_cpu1 = get_cpustate();
+        sleep(5);
+        lli p_cpu2 = get_child_cpustate(proc);
+        lli c_cpu2 = get_cpustate();
+        printf("cpu: %f\n",(float)(p_cpu2-p_cpu1)/(c_cpu2-c_cpu1));
+    }
 
     return;
 }
