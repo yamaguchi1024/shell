@@ -11,6 +11,7 @@
 #include<termios.h>
 #include<fcntl.h>
 #include<sys/wait.h>
+#include<time.h>
 
 #include "util.h"
 #include "ringlist.h"
@@ -51,6 +52,9 @@ lli get_cpustate(void){
 
 void display_mems(int pid)
 {
+    time_t begintime;
+    time(&begintime);
+    time_t nowtime;
     char proc[]="/proc/";
     char stat[]="/stat";
     char p[20]={'\0'};
@@ -66,6 +70,8 @@ void display_mems(int pid)
         lli p_cpu2 = get_child_cpustate(proc);
         lli c_cpu2 = get_cpustate();
         printf("cpu: %f\n",(float)(p_cpu2-p_cpu1)/(c_cpu2-c_cpu1));
+        time(&nowtime);
+        printf("time: %d\n",nowtime-begintime);
     }
 
     return;
