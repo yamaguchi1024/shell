@@ -1,102 +1,60 @@
-#include<cstdio>
-#include<iostream>
-#include<unistd.h>
-#include<stdlib.h>
-#include<sys/types.h>
-#include<sys/wait.h>
-#include<sys/stat.h>
-#include<string.h>
-#include<signal.h>
+#include <unistd.h>
+#include <ios>
+#include <iostream>
+#include <fstream>
+#include <string>
 
-void execute(std::string oprand[],int size){
-	int fork_result = fork();
-	char *args[100];
-	char tmp[100][100];
-	for(int i=0;i<size;i++){
-		strcpy(tmp[i],oprand[i].c_str());
-		args[i]=tmp[i];
-	}
-	args[size]=NULL;
+//////////////////////////////////////////////////////////////////////////////
+//
+// process_mem_usage(double &, double &) - takes two doubles by reference,
+// attempts to read the system-dependent data for a process' virtual memory
+// size and resident set size, and return the results in KB.
+//
+// On failure, returns 0.0, 0.0
 
-	if(fork_result==0){
-		//std::cout<< "created pid" <<  getpid() << std::endl;
-		printf("exit status%d\n",execvp(args[0],args));
-		//printf("%d\n",execl("/bin/ls","/bin/ls",NULL));
-		exit(0);
-	}
-	else if(fork_result==-1) printf("Fork Failed!\n");
+void process_mem_usage(double& vm_usage, double& resident_set)
+{
+   using std::ios_base;
+   using std::ifstream;
+   using std::string;
 
-	//std::cout <<"Child pid" << fork_result << std::endl;
-	int status;
-	waitpid(fork_result,&status,WUNTRACED);
-	printf("child process done.\n");
+   vm_usage     = 0.0;
+   resident_set = 0.0;
 
-	if(WIFEXITED(status)){
-		printf("exit status=%d\n",WEXITSTATUS(status));
-	}else{
-		printf("exit abnormally\n");
-	}
+   // 'file' stat seems to give the most reliable results
+   //
+   ifstream stat_stream("/proc/self/stat",ios_base::in);
+
+   // dummy vars for leading entries in stat that we don't care about
+   //
+   string pid, comm, state, ppid, pgrp, session, tty_nr;
+   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
+   string utime, stime, cutime, cstime, priority, nice;
+   string O, itrealvalue, starttime;
+
+   // the two fields we want
+   //
+   unsigned long vsize;
+   long rss;
+
+   stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
+               >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
+               >> utime >> stime >> cutime >> cstime >> priority >> nice
+               >> O >> itrealvalue >> starttime >> vsize >> rss; // don't care about the rest
+
+   stat_stream.close();
+
+   long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
+   vm_usage     = vsize / 1024.0;
+   resident_set = rss * page_size_kb;
 }
-std::string path(std::string opr){
-	char env[100];
-	char *tmp=getenv("PATH");
-	strcpy(env,tmp);
-	char *tp;
-	tp=strtok(env,":");
-	std::string paths[10];
-	int i=0;
-	while(tp!=NULL){
-		paths[i]=std::string(tp);
-		i++;
-		tp=strtok(NULL,":");
-	}
-	std::string rtn=opr;
-	for(int j=0;j<i;j++){
-		if(!access((paths[j]+"/"+opr).c_str(),X_OK)){
-			rtn=paths[j]+"/"+opr;
-			break;
-		}
-	}
-	return rtn;
-}
-void SigHandler(int p_signame){
-	signal(SIGINT,SigHandler);	
-	printf("\n>>");
-	std::cout << std::flush ;
-	return;
-}	
 
-int main(){
-	signal(SIGINT,SigHandler);	
+int main()
+{
+   using std::cout;
+   using std::endl;
 
-	printf("これはshellです。という強い主張。\n");
-	while(1){
-		printf(">>");
-		std::string oprand;
-		std::getline(std::cin,oprand);
-		char tmp[100];
-		strcpy(tmp,oprand.c_str());
-		char *tp;
-		tp=strtok(tmp," ");
-		std::string ops[10];
-		int i=0;
-		while(tp!=NULL){
-			ops[i]=std::string(tp);
-			i++;
-			tp=strtok(NULL," ");
-		}
-
-		if(ops[0]=="cd"){
-			//printf("change dir: %d",chdir(ops[1].c_str()));
-			chdir(ops[1].c_str());
-		}else if(ops[0]=="exit" || ops[0]=="quit"){
-			return 0;
-		}else{
-			//std::cout << "ops[0]: " << ops[0] << "ops[1]: " << ops[1] << "i: " << i << std::endl;
-			execute(ops,i);
-		}
-
-	}
-
-	return 0;
+   double vm, rss;
+   process_mem_usage(vm, rss);
+   cout << "VM: " << vm << "; RSS: " << rss << endl;
 }

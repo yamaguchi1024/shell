@@ -89,15 +89,15 @@ void execute(std::string oprand[],int size) {
         }
         it = ringlist_erase(it);
 
-        printf("child process done.\n");
+        //printf("child process done.\n");
         if(WIFEXITED(status)){
-            printf("child process exit status=%d\n",WEXITSTATUS(status));
+            //printf("child process exit status=%d\n",WEXITSTATUS(status));
         }else{
-            printf("exit abnormally\n");
+            //printf("exit abnormally\n");
         }
     }
     free(it);
-    printf("all children exited\n");
+    //printf("all children exited\n");
     return;
 
 }
@@ -145,110 +145,116 @@ void uparrow(int x){
 		ss[i]=(char*)malloc(sizeof(s));
 		strcpy(ss[i],s);
 		i++;
-		//fflush(stdin);
 	}
 	if(i<x+1){ return;}
-	strcpy(s,ss[i-x-1]);
+  char ns[256];
+	strcpy(ns,ss[i-x-1]);
+
+  int j;
+  for(j=0;j<i;j++) free(ss[j]);
+
 	int q=0;
 	while(1){
-		if(s[q]=='\n'){ s[q]='\0'; break;}
+		if(ns[q]=='\n'){ ns[q]='\0'; break;}
 		q++;
-	}
-	printf("%s",s);
-	while(1){
-		if(kbhit()){
-			int c;
-			c=getchar();
-			if(c=='\n'){
-				char tmp[100];
-				strcpy(tmp,s);
-				char *tp;
-				tp=strtok(tmp," ");
-				std::string ops[10];
-				int i=0;
-				while(tp!=NULL){
-					ops[i]=std::string(tp);
-					i++;
-					tp=strtok(NULL," ");
-				}
-				printf("\n");
-				execute(ops,i);
-				break;
-			}else{
-				while(getchar()!=EOF){
-				}
-				break;
-			}
-		}
-	}
+  }
+  if(x==0)printf("%s",ns);
+  else{
+    printf("\r                       ");
+    printf("\r\033[%dm>>\033[0m%s",31,ns);
+  }
 
-	int j;
-	for(j=0;j<i;j++) free(ss[j]);
+  char c = 0;
+  while(1){
+    if(kbhit()){
+      c=getchar();
+      if(c=='\x1B'){ 
+        c=getchar();
+        c=getchar();
+        fflush(stdout);
+        fclose(fp);
+        uparrow(x+1);
+        break;}
+    }else if(c == '\n'){
+      char tmp[100];
+      strcpy(tmp,ns);
+      char *tp;
+      tp=strtok(tmp," ");
+      std::string ops[10];
+      int i=0;
+      while(tp!=NULL){
+        ops[i]=std::string(tp);
+        i++;
+        tp=strtok(NULL," ");
+      }
+      printf("\n");
+      fclose(fp);
+      execute(ops,i);
+      break;
+    }
+  }
 
-	fclose(fp);
-	return;
+  return;
 }
 
 int main(){
-	signal(SIGINT,SigHandler);	
-	int uparrow_cnt=-1;
+  signal(SIGINT,SigHandler);	
 
-	while(1){
-		printf("\033[%dm>>\033[0m",31);
-		std::string oprand;
-		int c;
-		while(1){
-      usleep(100000);
-			if(kbhit()){
-				c=getchar();
-				if(c=='\x1B'){ 
-					c=getchar();
-					c=getchar();
-					oprand="\x1B[";
-					oprand+=(char)c;
-					break;}
-				else{printf("%c",c);}
-				if(c=='\n') break;
-				oprand+=(char)c;
-			}
-		}
+  while(1){
+    printf("\033[%dm>>\033[0m",31);
+    fflush(stdout);
+    std::string oprand;
+    int c;
+    while(1){
+      if(kbhit()){
+        c=getchar();
+        if(c=='\x1B'){ 
+          c=getchar();
+          c=getchar();
+          oprand="\x1B\x5b";
+          oprand+=(char)c;
+          break;}
+        else{
+          ungetc(c,stdin);
+          printf("%c",c);
+          std::getline(std::cin,oprand);
+          break;
+        }
+      }
+    }
 
-		//fileに書き込み
-		if(oprand[0]!='\x1B'){
-			FILE *fp;
-			fp=fopen(".shrc","a");
-			if(fp==NULL){ printf("cannot open .shrc\n");}
-			fputs((oprand+"\n").c_str(),fp);
-			fclose(fp);
-		}
+    if(oprand[0]!='\x1B'){
+      FILE *fp;
+      fp=fopen(".shrc","a");
+      if(fp==NULL){ printf("cannot open .shrc\n");}
+      fputs((oprand+"\n").c_str(),fp);
+      fclose(fp);
+    }
 
-		char tmp[100];
-		strcpy(tmp,oprand.c_str());
-		char *tp;
-		tp=strtok(tmp," ");
-		std::string ops[10];
-		int i=0;
-		while(tp!=NULL){
-			ops[i]=std::string(tp);
-			i++;
-			tp=strtok(NULL," ");
-		}
+    char tmp[100];
+    strcpy(tmp,oprand.c_str());
+    char *tp;
+    tp=strtok(tmp," ");
+    std::string ops[10];
+    int i=0;
+    while(tp!=NULL){
+      ops[i]=std::string(tp);
+      i++;
+      tp=strtok(NULL," ");
+    }
 
-		if(ops[0]=="\x1B[A"){
-			uparrow_cnt++;
-			uparrow(uparrow_cnt);
-		}else if(ops[0]=="cd"){
-			uparrow_cnt=-1;
-			chdir(ops[1].c_str());
-		}else if(ops[0]=="exit" || ops[0]=="quit" || ops[0]=="q"){
-			unlink(".shrc");
-			return 0;
-		}else{
-			uparrow_cnt=-1;
-			execute(ops,i);
-		}
+    if(ops[0]=="\x1B\x5b\x41"){
+      uparrow(0);
+    }else if(ops[0]=="cd"){
+      chdir(ops[1].c_str());
+    }else if(ops[0]=="exit" || ops[0]=="quit" || ops[0]=="q"){
+      unlink(".shrc");
+      return 0;
+    }else{
+      execute(ops,i);
+    }
 
-	}
+  }
 
-	return 0;
+  return 0;
 }
