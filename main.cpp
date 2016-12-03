@@ -24,17 +24,22 @@ struct mems{
     char* vmrss;
 };
 
-lli get_child_cpustate(char *proc){
+lli get_child_cpustate(char *proc1){
+    char proc[30];
+    strcpy(proc,proc1);
+    char stat[]="/stat";
+    strcat(proc,stat);
     FILE *fp;
     if((fp=fopen(proc,"r"))==NULL){ printf("stat open error!\n"); return -1;}
     int i=0;
     char state[20];
     lli utime;
     lli stime;
+    int t;
     for(i=0;i<15;i++){
-        if(i==13) fscanf(fp,"%lld",&utime);
-        if(i==14) fscanf(fp,"%lld",&stime);
-        else fscanf(fp,"%s",state);
+        if(i==13) t = fscanf(fp,"%lld",&utime);
+        if(i==14) t = fscanf(fp,"%lld",&stime);
+        else t = fscanf(fp,"%s",state);
     }
     fclose(fp);
     return utime+stime;
@@ -44,29 +49,63 @@ lli get_cpustate(void){
     FILE *fp;
     if((fp = fopen("/proc/stat","r")) == NULL){ printf("/proc/stat open error!\n"); }
     char tmp[20];
-    fscanf(fp,"%s",tmp);
+    int t;
+    t = fscanf(fp,"%s",tmp);
     int i=0;
     lli time;
     lli res;
     for(i=0;i<10;i++){
-        fscanf(fp,"%lld",&time);
+        t = fscanf(fp,"%lld",&time);
         res +=time;
     }
     fclose(fp);
     return res;
 }
 
-Mems get_mem_state(char *proc){
+Mems get_mem_state(char *proc1){
+    char proc[50];
+    strcpy(proc,proc1);
+    char stats[]="/status";
+    strcat(proc,stats);
     FILE *fp;
-    if((fp = fopen(proc,"r"))==NULL){ printf("stat open error!\n");}
+    if((fp = fopen(proc,"r"))==NULL){ printf("status open error!\n");}
     Mems m = (Mems)malloc(100);
-    m->vmsize = (char*)malloc(50);
-    m->vmpeak = (char*)malloc(50);
-    m->vmrss = (char*)malloc(50);
-    char s[]="mama!";
-    strcpy(m->vmsize,s);
-    strcpy(m->vmpeak,s);
-    strcpy(m->vmrss,s);
+    int i=0;
+    char g[200];
+    m->vmpeak = (char*)malloc(100);
+    m->vmsize = (char*)malloc(100);
+    m->vmrss = (char*)malloc(100);
+    char vp[50]="VmPeak:";
+    char vs[50]="VmSize:";
+    char vr[50]="VmRSS:";
+    int t;
+    while(1){
+        t = fscanf(fp,"%s",g);
+        if(!strcmp(g,vp)){ 
+            t = fscanf(fp,"%s",g);
+            strcat(vp,g);
+            t = fscanf(fp,"%s",g);
+            strcat(vp,g);
+            strcpy(m->vmpeak,vp);
+        }
+        if(!strcmp(g,vs)){ 
+            t = fscanf(fp,"%s",g);
+            strcat(vs,g);
+            t = fscanf(fp,"%s",g);
+            strcat(vs,g);
+            m->vmsize = vs;
+            strcpy(m->vmsize,vs);
+        }
+        if(!strcmp(g,vr)){ 
+            t = fscanf(fp,"%s",g);
+            strcat(vr,g);
+            t = fscanf(fp,"%s",g);
+            strcat(vr,g);
+            m->vmrss =vr;
+            strcpy(m->vmrss,vr);
+            break;
+        }
+    }
     return m;
 }
 
@@ -76,32 +115,31 @@ void display_mems(int pid)
     time_t begintime;
     time(&begintime);
     time_t nowtime;
-    char proc[]="/proc/";
-    char proc2[]="/proc/";
-    char stat[]="/stat";
-    char stats[]="/status";
+    char proc[50]="/proc/";
     char p[20]={'\0'};
     sprintf(p,"%d",pid);
     strcat(proc,p);
-    strcat(proc2,p);
-    strcat(proc,stat);
-    strcat(proc2,stats);
     int status;
+    printf("mama\n");
 
     while(1){
-        int c_st = waitpid(pid,&status,WNOHANG);
-        //if(WIFEXITED(status) || WIFSIGNALED(status)) return;
-        if(c_st > 0) return;
+        //if(c_st > 0 || WIFEXITED(status) || WIFSIGNALED(status)) break;
+        printf("koko\n");
+        int c_st = waitpid(pid,&status, WNOHANG| WUNTRACED | WCONTINUED);
+        printf("c_st: %d\n",c_st);
+        if(c_st > 0){
+            if(WIFEXITED(status) || WIFSIGNALED(status)){ printf("break\n"); break;};
+        }
         lli p_cpu1 = get_child_cpustate(proc);
         lli c_cpu1 = get_cpustate();
-        sleep(5);
+        sleep(2);
         lli p_cpu2 = get_child_cpustate(proc);
         lli c_cpu2 = get_cpustate();
         printf("cpu utilization: %f\n",(float)(p_cpu2-p_cpu1)/(c_cpu2-c_cpu1));
-    //    Mems c_mem = get_mem_state(proc2);
-    //    printf("%s %s %s\n",c_mem->vmpeak,c_mem->vmsize,c_mem->vmrss);
+        Mems c_mem = get_mem_state(proc);
+        printf("%s %s %s\n",c_mem->vmpeak,c_mem->vmsize,c_mem->vmrss);
         time(&nowtime);
-        printf("passed time: %f\n",difftime(nowtime,begintime));
+        printf("passed time: %f\n\n",difftime(nowtime,begintime));
     }
 
     return;
@@ -154,7 +192,8 @@ for(q=0;q<size;q++){
     else if(oprand[q]=="|"){
         last = min(last, q);
         int pipefd[2];
-        pipe2(pipefd,O_CLOEXEC);
+        int t;
+        t = pipe2(pipefd,O_CLOEXEC);
         execute2(childpid,oprand+q+1,size-q-1,pipefd[0],1);
         if(out!= 1) close(out);
         out = pipefd[1];
@@ -339,7 +378,8 @@ int main(){
         if(ops[0]=="\x1B\x5b\x41"){
             uparrow(0);
         }else if(ops[0]=="cd"){
-            chdir(ops[1].c_str());
+            int t;
+            t = chdir(ops[1].c_str());
         }else if(ops[0]=="exit" || ops[0]=="quit" || ops[0]=="q"){
             unlink(".shrc");
             return 0;
