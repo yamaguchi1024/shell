@@ -12,7 +12,7 @@
 #include<fcntl.h>
 #include<sys/wait.h>
 #include<time.h>
-
+#include<errno.h>
 #include "util.h"
 #include "ringlist.h"
 typedef long long int lli;
@@ -23,6 +23,13 @@ struct mems{
     char* vmsize;
     char* vmrss;
 };
+static volatile int handled_pid = 0;
+static volatile int handled_status = 0;
+
+static void handler(int sig)
+{
+    handled_pid = wait((int*)&handled_status);
+}
 
 lli get_child_cpustate(char *proc1){
     char proc[30];
@@ -120,15 +127,22 @@ void display_mems(int pid)
     sprintf(p,"%d",pid);
     strcat(proc,p);
     int status;
-    printf("mama\n");
 
     while(1){
-        //if(c_st > 0 || WIFEXITED(status) || WIFSIGNALED(status)) break;
-        printf("koko\n");
-        int c_st = waitpid(pid,&status, WNOHANG| WUNTRACED | WCONTINUED);
-        printf("c_st: %d\n",c_st);
-        if(c_st > 0){
-            if(WIFEXITED(status) || WIFSIGNALED(status)){ printf("break\n"); break;};
+        int st = handled_status;
+        printf("%d\n",handled_pid);
+        if(handled_pid == -1) printf("%s",strerror(errno));
+        if(handled_pid>=0){
+            if (WIFEXITED(st)) {
+                printf("child exited: %d\n", WEXITSTATUS(st));
+                break;
+            } else if (WIFSIGNALED(st)) {
+                printf("child signaled: %d\n", WTERMSIG(st));
+                break;
+            } else if (WIFSTOPPED(st)) {
+                printf("child signaled: %d\n", WSTOPSIG(st));
+                break;
+            }
         }
         lli p_cpu1 = get_child_cpustate(proc);
         lli c_cpu1 = get_cpustate();
@@ -331,6 +345,7 @@ void uparrow(int x){
 
 int main(){
     signal(SIGINT,SigHandler);	
+    signal(SIGCHLD,handler);
 
     while(1){
         printf("\033[%dm>>\033[0m",31);
