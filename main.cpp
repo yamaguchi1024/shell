@@ -15,8 +15,15 @@
 
 #include "util.h"
 #include "ringlist.h"
-
 typedef long long int lli;
+
+typedef struct mems *Mems;
+struct mems{
+    char* vmpeak;
+    char* vmsize;
+    char* vmrss;
+};
+
 lli get_child_cpustate(char *proc){
     FILE *fp;
     if((fp=fopen(proc,"r"))==NULL){ printf("stat open error!\n"); return -1;}
@@ -49,6 +56,20 @@ lli get_cpustate(void){
     return res;
 }
 
+Mems get_mem_state(char *proc){
+    FILE *fp;
+    if((fp = fopen(proc,"r"))==NULL){ printf("stat open error!\n");}
+    Mems m = (Mems)malloc(100);
+    m->vmsize = (char*)malloc(50);
+    m->vmpeak = (char*)malloc(50);
+    m->vmrss = (char*)malloc(50);
+    char s[]="mama!";
+    strcpy(m->vmsize,s);
+    strcpy(m->vmpeak,s);
+    strcpy(m->vmrss,s);
+    return m;
+}
+
 
 void display_mems(int pid)
 {
@@ -56,22 +77,31 @@ void display_mems(int pid)
     time(&begintime);
     time_t nowtime;
     char proc[]="/proc/";
+    char proc2[]="/proc/";
     char stat[]="/stat";
+    char stats[]="/status";
     char p[20]={'\0'};
     sprintf(p,"%d",pid);
     strcat(proc,p);
+    strcat(proc2,p);
     strcat(proc,stat);
+    strcat(proc2,stats);
     int status;
 
     while(1){
+        int c_st = waitpid(pid,&status,WNOHANG);
+        //if(WIFEXITED(status) || WIFSIGNALED(status)) return;
+        if(c_st > 0) return;
         lli p_cpu1 = get_child_cpustate(proc);
         lli c_cpu1 = get_cpustate();
         sleep(5);
         lli p_cpu2 = get_child_cpustate(proc);
         lli c_cpu2 = get_cpustate();
-        printf("cpu: %f\n",(float)(p_cpu2-p_cpu1)/(c_cpu2-c_cpu1));
+        printf("cpu utilization: %f\n",(float)(p_cpu2-p_cpu1)/(c_cpu2-c_cpu1));
+    //    Mems c_mem = get_mem_state(proc2);
+    //    printf("%s %s %s\n",c_mem->vmpeak,c_mem->vmsize,c_mem->vmrss);
         time(&nowtime);
-        printf("time: %d\n",nowtime-begintime);
+        printf("passed time: %f\n",difftime(nowtime,begintime));
     }
 
     return;
