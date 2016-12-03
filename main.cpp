@@ -23,12 +23,23 @@ struct mems{
     char* vmsize;
     char* vmrss;
 };
-static volatile int handled_pid = 0;
-static volatile int handled_status = 0;
+int handled_pid = 0;
+int handled_status = 0;
 
-static void handler(int sig)
+void SigHandler(int p_signame){
+    signal(SIGINT,SigHandler);	
+    printf("\n\033[%dm>>\033[0m",31);
+    fflush(stdout);
+    return;
+}	
+
+void handler(int sig)
 {
-    handled_pid = wait((int*)&handled_status);
+    signal(SIGCHLD,handler);
+    handled_pid = waitpid(0,(int*)&handled_status,WUNTRACED | WCONTINUED);
+    printf("error %d %s\n",errno,strerror(errno));
+    printf("handled_pid: %d handled_status: %d\n",handled_pid,WEXITSTATUS(handled_status));
+    return;
 }
 
 lli get_child_cpustate(char *proc1){
@@ -36,6 +47,7 @@ lli get_child_cpustate(char *proc1){
     strcpy(proc,proc1);
     char stat[]="/stat";
     strcat(proc,stat);
+    printf("proc %s\n",proc);
     FILE *fp;
     if((fp=fopen(proc,"r"))==NULL){ printf("stat open error!\n"); return -1;}
     int i=0;
@@ -74,6 +86,7 @@ Mems get_mem_state(char *proc1){
     strcpy(proc,proc1);
     char stats[]="/status";
     strcat(proc,stats);
+    printf("proc %s\n",proc);
     FILE *fp;
     if((fp = fopen(proc,"r"))==NULL){ printf("status open error!\n");}
     Mems m = (Mems)malloc(100);
@@ -113,6 +126,7 @@ Mems get_mem_state(char *proc1){
             break;
         }
     }
+    fclose(fp);
     return m;
 }
 
@@ -130,9 +144,8 @@ void display_mems(int pid)
 
     while(1){
         int st = handled_status;
-        printf("%d\n",handled_pid);
         if(handled_pid == -1) printf("%s",strerror(errno));
-        if(handled_pid>=0){
+        if(handled_pid>0){
             if (WIFEXITED(st)) {
                 printf("child exited: %d\n", WEXITSTATUS(st));
                 break;
@@ -155,11 +168,11 @@ void display_mems(int pid)
         time(&nowtime);
         printf("passed time: %f\n\n",difftime(nowtime,begintime));
     }
-
-    return;
+        return;
 }
 
 int execute3(std::string oprand[],int size, int in, int out){
+    signal(SIGCHLD,SIG_IGN);
     int fork_result = fork();
     switch(fork_result) {
         case -1: // error
@@ -247,12 +260,6 @@ void execute(std::string oprand[],int size) {
     return;
 
 }
-void SigHandler(int p_signame){
-    signal(SIGINT,SigHandler);	
-    printf("\n\033[%dm>>\033[0m",31);
-    fflush(stdout);
-    return;
-}	
 int kbhit(void)
 {
     struct termios oldt, newt;
@@ -345,7 +352,6 @@ void uparrow(int x){
 
 int main(){
     signal(SIGINT,SigHandler);	
-    signal(SIGCHLD,handler);
 
     while(1){
         printf("\033[%dm>>\033[0m",31);
