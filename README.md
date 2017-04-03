@@ -1,4 +1,4 @@
-This is a original shell implemented by [yamaguchi1024](https://yamaguchi1024.github.io) (Yuka Takahahashi) and [cookies146](https://cookies146.github.io)
+This is a original shell implemented by [yamaguchi1024](https://yamaguchi1024.github.io) (Yuka Takahahashi) and [cookies146](https://cookie-s.github.io)
 
 In this shell, you can execute commands like below.
 ![0.png](https://github.com/yamaguchi1024/shell/blob/master/0.png)
