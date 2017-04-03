@@ -104,6 +104,7 @@ Mems get_mem_state(char *proc1){
 }
 
 
+//This function is called by main.cpp exucution3.
 void display_mems(int pid, int handled_status, int handled_pid)
 {
     time_t begintime;
@@ -115,7 +116,8 @@ void display_mems(int pid, int handled_status, int handled_pid)
     strcat(proc,p);
     int status;
 
-    while(1){
+    //if pid doesn't exist, break;
+    while(!kill(pid,0)){
         int st = handled_status;
         if(handled_pid == -1) printf("%s",strerror(errno));
         if(handled_pid>0){
@@ -130,9 +132,11 @@ void display_mems(int pid, int handled_status, int handled_pid)
                 break;
             }
         }
+        //call functions to get values of cpu time and memory status
         lli p_cpu1 = get_child_cpustate(proc);
         lli c_cpu1 = get_cpustate();
         sleep(2);
+        if(kill(pid,0)) break;
         lli p_cpu2 = get_child_cpustate(proc);
         lli c_cpu2 = get_cpustate();
         printf("cpu utilization: %f\n",(float)(p_cpu2-p_cpu1)/(c_cpu2-c_cpu1));
@@ -143,4 +147,3 @@ void display_mems(int pid, int handled_status, int handled_pid)
     }
         return;
 }
-

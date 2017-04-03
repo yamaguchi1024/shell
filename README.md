@@ -1,4 +1,4 @@
-This is a original C only used shell implemented by yamaguchi1024(Yuka Takahahashi) and @cookies146
+This is a original shell implemented by yamaguchi1024(Yuka Takahahashi) and @cookies146
 
 ## Install
 ````
