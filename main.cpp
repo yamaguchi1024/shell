@@ -225,6 +225,17 @@ int main(){
         fflush(stdout);
         std::string oprand;
         int c;
+
+        struct termios oldt, newt;
+        int oldf;
+
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
         while(1){
             if(kbhit()){
                 c=getchar();
@@ -233,15 +244,19 @@ int main(){
                     c=getchar();
                     oprand="\x1B\x5b";
                     oprand+=(char)c;
-                    break;}
-                else{
-                    ungetc(c,stdin);
-                    printf("%c",c);
-                    std::getline(std::cin,oprand);
                     break;
+                }
+                else{
+                    printf("%c",c);
+                    fflush(stdout);
+                    if(c=='\n') break;
+                    oprand+=(char)c;
                 }
             }
         }
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, oldf);
 
         if(oprand[0]!='\x1B'){
             FILE *fp;
