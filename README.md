@@ -1,7 +1,5 @@
-<<<<<<< HEAD
 This is a original shell implemented by [yamaguchi1024](https://yamaguchi1024.github.io) (Yuka Takahahashi) and [cookies146](https://cookies146.github.io)
 Signal handling, searching history, pipe, redirect is supported.
->>>>>>> 662ef2dd13175d0efec3c54ac069e282a4804f55
 
 In this shell, you can execute any commands like below.
 ![0.png](https://github.com/yamaguchi1024/shell/blob/master/images/0.png)
